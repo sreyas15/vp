@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>graVITas'25 | Vehicle Platooning</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: #f0f0f0; }
+        .hero-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; opacity: 0.3;
+        }
+        .hero-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,1) 90%); z-index: -1;
+        }
+        .header-title, .hero-title { font-family: 'Orbitron', sans-serif; }
+        .hero-title {
+            text-shadow: 0 0 15px rgba(255, 0, 0, 0.7), 0 0 25px rgba(255, 0, 0, 0.5);
+            animation: flicker 3s infinite alternate;
+        }
+        @keyframes flicker {
+            0%, 18%, 22%, 25%, 53%, 57%, 100% { text-shadow: 0 0 8px #fff, 0 0 15px #fff, 0 0 25px #ff2d2d, 0 0 40px #ff2d2d, 0 0 70px #ff2d2d; }
+            20%, 24%, 55% { text-shadow: none; }
+        }
+        .glass-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up { animation: fade-in-up 0.5s ease-out forwards; }
+        
+        .tech-logo-container { transition: transform 0.3s ease, filter 0.3s ease; cursor: pointer; }
+        .tech-logo-container:hover { transform: scale(1.1); filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.7)); }
+        .tech-logo-container.active { transform: scale(1.1); filter: drop-shadow(0 0 15px #ef4444); }
+        .tech-desc { max-height: 0; overflow: hidden; transition: max-height 0.5s ease-out, opacity 0.5s ease-out, padding 0.5s ease-out; opacity: 0; padding-top: 0; padding-bottom: 0; }
+        .tech-desc.visible { max-height: 500px; opacity: 1; padding-top: 1rem; padding-bottom: 1rem; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <video autoplay loop muted playsinline class="hero-bg" id="background-video">
+        <source src="./intro_video.mp4" type="video/mp4">
+    </video>
+    <div class="hero-overlay"></div>
+    <audio id="introAudio" loop>
+        <source src="./f1_car_sound.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="startOverlay" class="fixed inset-0 z-50 bg-black flex flex-col justify-center items-center text-center p-4 cursor-pointer">
+        <h1 class="text-4xl font-bold text-white mb-4 header-title">Welcome</h1>
+        <p class="text-xl text-slate-300 animate-pulse">Click anywhere to begin</p>
+    </div>
+
+    <div id="appContainer" class="min-h-screen flex flex-col opacity-0 transition-opacity duration-1000">
+        <header class="sticky top-0 z-30 w-full py-4 px-6">
+            <div class="max-w-7xl mx-auto flex items-center justify-between">
+                <h1 class="header-title text-2xl md:text-3xl font-bold text-white cursor-pointer" id="homeBtn">graVITas'25</h1>
+                <div class="flex items-center gap-4">
+                    <div id="statusIndicator" class="flex items-center space-x-2 hidden">
+                        <div id="statusDot" class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <span id="statusText" class="text-sm font-medium text-slate-300">Connecting...</span>
+                    </div>
+                    <button id="logoutBtn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg text-sm hidden">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <main id="mainContent" class="flex-grow flex flex-col justify-center">
+            
+            <div id="heroSection" class="text-center px-4 animate-fade-in-up">
+                <p class="text-red-500 font-semibold tracking-wider">TEAM Seriously_IDK presents</p>
+                <h1 class="hero-title text-5xl md:text-7xl font-bold text-white my-4">VEHICLE PLATOONING</h1>
+                <p class="max-w-3xl mx-auto text-slate-300 text-lg">RL based-Autonomous Vehicle Platooning with Fuel Reduction in CARLA</p>
+                <div class="mt-12 space-x-4">
+                    <button id="dashboardBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg transition-transform transform hover:scale-105">Live Dashboard</button>
+                    <button id="infoBtn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg transition-transform transform hover:scale-105">Information</button>
+                </div>
+            </div>
+            
+            <div id="loginSection" class="hidden max-w-md mx-auto w-full p-4 animate-fade-in-up">
+                <div class="glass-card p-8 rounded-xl text-center">
+                    <h2 class="text-3xl font-bold text-white header-title mb-6">Admin Login</h2>
+                    <div class="space-y-4">
+                        <input id="username" type="text" placeholder="Username" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <input id="password" type="password" placeholder="Password" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-red-500">
+                    </div>
+                    <button id="loginBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 mt-6 rounded-lg transition-transform transform hover:scale-105">Login</button>
+                    <p id="loginError" class="text-red-400 mt-4 h-4"></p>
+                </div>
+            </div>
+            
+            <div id="infoSection" class="hidden max-w-4xl mx-auto w-full p-4 animate-fade-in-up">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl md:text-5xl font-bold text-white header-title">How It Works</h2>
+                    <p class="text-slate-400 mt-2">The journey from simulation to real-time visualization.</p>
+                </div>
+                <div class="space-y-8">
+                    <div class="flex flex-col md:flex-row items-center gap-6">
+                        <div class="bg-red-600 text-white w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center text-2xl font-bold header-title">1</div>
+                        <div class="glass-card p-6 rounded-lg">
+                            <h3 class="font-bold text-xl text-white mb-2">Simulation in CARLA</h3>
+                            <p class="text-slate-300">The process begins in CARLA, a hyper-realistic simulator. Here, a fleet of AI-driven vehicles is spawned into a complex urban environment. Each vehicle is equipped with virtual sensors to perceive its surroundings, mimicking real-world conditions.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col md:flex-row-reverse items-center gap-6">
+                        <div class="bg-red-600 text-white w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center text-2xl font-bold header-title">2</div>
+                        <div class="glass-card p-6 rounded-lg w-full">
+                            <h3 class="font-bold text-xl text-white mb-2">Reinforcement Learning</h3>
+                            <p class="text-slate-300">The AI agents controlling the vehicles learn through trial and error using Reinforcement Learning. They are rewarded for efficient driving (like saving fuel by drafting in a platoon) and penalized for unsafe actions. Over millions of iterations, they master the optimal strategies for safe and efficient platooning.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col md:flex-row items-center gap-6">
+                        <div class="bg-red-600 text-white w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center text-2xl font-bold header-title">3</div>
+                        <div class="glass-card p-6 rounded-lg">
+                            <h3 class="font-bold text-xl text-white mb-2">Data Transmission to Backend</h3>
+                            <p class="text-slate-300">As the simulation runs, a constant stream of telemetry data—speed, fuel use, CO₂, location, platooning status—for every vehicle is collected and sent to our lightweight Node.js backend server.</p>
+                        </div>
+                    </div>
+                     <div class="flex flex-col md:flex-row-reverse items-center gap-6">
+                        <div class="bg-red-600 text-white w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center text-2xl font-bold header-title">4</div>
+                        <div class="glass-card p-6 rounded-lg w-full">
+                            <h3 class="font-bold text-xl text-white mb-2">Real-time Broadcast via WebSockets</h3>
+                            <p class="text-slate-300">The backend server instantly processes this data and broadcasts it over a persistent WebSocket connection. This "push" technology ensures that every connected dashboard receives updates the moment they happen, without any delay or need for refreshing.</p>
+                        </div>
+                    </div>
+                     <div class="flex flex-col md:flex-row items-center gap-6">
+                        <div class="bg-red-600 text-white w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center text-2xl font-bold header-title">5</div>
+                        <div class="glass-card p-6 rounded-lg">
+                            <h3 class="font-bold text-xl text-white mb-2">Live Visualization on Dashboard</h3>
+                            <p class="text-slate-300">Finally, your browser receives the WebSocket data. Client-side JavaScript immediately updates all the KPIs, charts, and vehicle cards on the dashboard, giving you a live, dynamic view of the fleet's performance.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-24">
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl md:text-5xl font-bold text-white header-title">Tech Stack</h2>
+                        <p class="text-slate-400 mt-2">The core technologies used to build this live telemetry dashboard.</p>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 items-center justify-items-center mb-8">
+                        <div class="tech-logo-container p-4" data-tech="html"><svg class="w-20 h-20 text-slate-400" fill="currentColor" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>HTML5</title><path d="M1.5 0h21l-1.91 21.563L11.977 24l-8.564-2.438L1.5 0zm7.031 9.75l-.232-2.718 10.059.003.23-2.622-13.298-.003.55 6.125h12.17l-.465 5.088-4.011 1.088-3.93-1.088-.25-2.85h-2.688l.33 4.171L12 19.351l5.385-1.443.53-5.83-11.854.002z"/></svg></div>
+                        <div class="tech-logo-container p-4" data-tech="tailwind"><svg class="w-20 h-20 text-slate-400" fill="currentColor" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Tailwind CSS</title><path d="M12.001,4.8c-3.2,0-5.2,1.6-6,4.8c1.2-1.6,2.6-2.2,4.2-1.8c0.913,0.228,1.565,0.89,2.288,1.624 C13.666,10.618,15.027,12,18.001,12c3.2,0,5.2-1.6,6-4.8c-1.2,1.6-2.6,2.2-4.2,1.8c-0.913-0.228-1.565-0.89-2.288-1.624 C16.334,6.182,14.973,4.8,12.001,4.8z M6.001,12c-3.2,0-5.2,1.6-6,4.8c1.2-1.6,2.6-2.2,4.2-1.8c0.913,0.228,1.565,0.89,2.288,1.624 c1.177,1.194,2.538,2.576,5.512,2.576c3.2,0,5.2-1.6,6-4.8c-1.2,1.6-2.6,2.2-4.2,1.8c-0.913-0.228-1.565-0.89-2.288-1.624 C10.334,13.382,8.973,12,6.001,12z"/></svg></div>
+                        <div class="tech-logo-container p-4" data-tech="js"><svg class="w-20 h-20 text-slate-400" fill="currentColor" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>JavaScript</title><path d="M0 0h24v24H0V0zm22.034 18.272c-.175-1.095-.82-2.22-1.93-3.033-.487-.358-1.04-.65-1.637-.872-.61-.227-1.254-.34-1.92-.34-.847 0-1.637.21-2.35.63-.71.42-1.294 1.01-1.74 1.77-.45.76-.67 1.63-.67 2.59h3.48c0-.57.14-1.05.42-1.44.28-.39.67-.58 1.17-.58.48 0 .88.16 1.2.48.32.32.48.74.48 1.26 0 .32-.05.6-.15.82-.1.22-.25.4-.45.54-.2.14-.45.24-.75.3-.3.06-.65.09-1.05.09h-.6v3.3h3.58c1.51 0 2.65-.4 3.4-1.2.75-.8 1.13-1.88 1.13-3.24 0-.6-.1-1.14-.3-1.62zm-11.45 5.42h-3.32V5.62h3.32v18.072z"/></svg></div>
+                        <div class="tech-logo-container p-4" data-tech="node"><svg class="w-20 h-20 text-slate-400" fill="currentColor" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Node.js</title><path d="M11.635 22.492c-.227.288-.532.443-.852.443H8.94c-.454 0-.87-.227-.87-.723v-2.18l-.01-5.634-.02-2.19c0-.463.385-.647.78-.395l1.96 1.233 1.95 1.223c.395.252.395.667 0 .918l-1.95 1.223-1.96 1.233V19.74l.01.624c0 .41.51.532.74.24l2.58-3.25c.238-.3.238-.732 0-1.032l-2.58-3.25c-.23-.298-.74-.17-.74.24v.624l.01 2.155.02 2.15c0 .45-.385.645-.78.395l-1.96-1.233-1.95-1.223c-.395-.252-.395-.667 0-.918l1.95-1.223 1.96-1.233c.395-.252.78-.068.78.395l.02 2.19.01 5.634v2.18c0 1.2.977 2.18 2.18 2.18h1.842c1.2 0 2.18-.98 2.18-2.18v-1.843c0-1.2.98-2.18 2.18-2.18h.723c.454 0 .87.227.87.723v2.18c0 .496-.416.723-.87.723h-1.843c-.32 0-.625.155-.852.443l-2.122 2.673zM12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm-1.83 14.22c.32 0 .625-.155.852-.443l2.12-2.674c.228-.288.533-.443.853-.443h1.842c.454 0 .87-.227.87-.723v-2.18c0-.496-.416-.723-.87-.723h-1.843c-.32 0-.625-.155-.852-.443l-2.12-2.674c-.228-.288-.533-.443-.853-.443H8.94c-.454 0-.87.227-.87.723v2.18c0 .496.416.723.87.723h1.843c.32 0 .625.155.852.443l2.12 2.674c.228-.288.533-.443.853-.443h.002z"/></svg></div>
+                        <div class="tech-logo-container p-4" data-tech="websockets"><svg class="w-20 h-20 text-slate-400" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>WebSockets</title><path d="M5.4 3.1H1.2c-.7 0-1.2.5-1.2 1.2v4.2c0 .7.5 1.2 1.2 1.2h4.2c.7 0 1.2-.5 1.2-1.2V4.3c0-.7-.5-1.2-1.2-1.2zm3.3 5.3v8.3c0 .5-.2.9-.5 1.2l-1.9 1.9c-.3.3-.8.3-1.2 0L3.2 18c-.3-.3-.5-.7-.5-1.2V8.4H1.2C.5 8.4 0 7.9 0 7.2V5.5c0-.7.5-1.2 1.2-1.2h2.9V1.2C4.1.5 4.6 0 5.3 0h1.7c.7 0 1.2.5 1.2 1.2v7.2c0 .7-.5 1.2-1.2 1.2H8.7zm15.4-4.1V.9c0-.5.2-.9.5-1.2L22.8.5c.3-.3.8-.3 1.2 0l1.9 1.9c.3.3.5.7.5 1.2v8.3h1.5c.7 0 1.2.5 1.2 1.2v1.7c0 .7-.5 1.2-1.2 1.2H24V20c0 .7-.5 1.2-1.2 1.2h-2.9v3.1c0 .7-.5 1.2-1.2 1.2h-1.7c-.7 0-1.2-.5-1.2-1.2V13.1c0-.7.5-1.2 1.2-1.2h.1zm-4.7-2.9h4.2c.7 0 1.2-.5 1.2-1.2V1.2c0-.7-.5-1.2-1.2-1.2h-4.2c-.7 0-1.2.5-1.2 1.2v4.2c0 .7.5 1.2 1.2 1.2z"/></svg></div>
+                        <div class="tech-logo-container p-4" data-tech="chartjs"><svg class="w-20 h-20 text-slate-400" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Chart.js</title><path d="M8.275 12.425v9.95c0 .351-.219.64-.563.64H2.812c-.344 0-.562-.289-.562-.64V12.425c0-.352.218-.641.562-.641h4.9c.344 0 .563.289.563.641zm7.06-5.858v15.808c0 .352-.218.641-.562.641H9.875c-.344 0-.563-.289-.563-.641V6.567c0-.352.219-.64.563-.64h4.9c.344 0 .562.288.562.64zM24 10.308v12.067c0 .352-.219.641-.563.641H18.5c-.344 0-.563-.289-.563-.641V10.308c0-.351.219-.64.563-.64h4.937c.344 0 .563.289.563.64zM15.338 0v23.375c0 .352-.219.641-.563.641H.563C.219 24.016 0 23.727 0 23.375V.64C0 .289.219 0 .562 0h14.213c.344 0 .562.289.562.64z"/></svg></div>
+                    </div>
+                    <div id="techDescriptionContainer" class="mt-4">
+                        <div id="html-desc" class="tech-desc glass-card rounded-lg p-6"><h3 class="font-bold text-lg text-red-400 mb-2">HTML5</h3><p class="text-slate-300">HTML provides the fundamental structure for all content on the page. We used semantic HTML5 to build the hero section, the dashboard layout with its KPI cards and chart containers, and the dynamic "Active Vehicles" section, ensuring the application is well-organized and accessible.</p></div>
+                        <div id="tailwind-desc" class="tech-desc glass-card rounded-lg p-6"><h3 class="font-bold text-lg text-red-400 mb-2">Tailwind CSS</h3><p class="text-slate-300">A utility-first CSS framework that allowed us to rapidly build this custom F1-themed design. We used Tailwind's classes for responsive layouts, colors, spacing, and the "glassmorphism" effect on the cards, which was critical for achieving the high-tech aesthetic without writing extensive custom CSS.</p></div>
+                        <div id="js-desc" class="tech-desc glass-card rounded-lg p-6"><h3 class="font-bold text-lg text-red-400 mb-2">JavaScript (Client-Side)</h3><p class="text-slate-300">The engine of the dashboard. All user interactions, navigation, and real-time data handling are managed by client-side JavaScript. It listens for WebSocket messages from the server, parses the incoming vehicle data, and dynamically updates all KPIs, charts, and vehicle cards to create a fluid, live experience.</p></div>
+                        <div id="node-desc" class="tech-desc glass-card rounded-lg p-6"><h3 class="font-bold text-lg text-red-400 mb-2">Node.js (Backend)</h3><p class="text-slate-300">Our backend is a lightweight Node.js server. Its primary jobs are to serve the main `index.html` file to users, listen for incoming data batches from the CARLA simulation via an HTTP endpoint, and manage the WebSocket server that broadcasts this data in real-time to all connected dashboards.</p></div>
+                        <div id="websockets-desc" class="tech-desc glass-card rounded-lg p-6"><h3 class="font-bold text-lg text-red-400 mb-2">WebSockets</h3><p class="text-slate-300">The core technology for our real-time communication. The server establishes a persistent, two-way WebSocket connection with each dashboard client. This allows the server to instantly "push" new vehicle data to the dashboard the moment it's received from the simulation, without the client needing to constantly ask for updates.</p></div>
+                        <div id="chartjs-desc" class="tech-desc glass-card rounded-lg p-6"><h3 class="font-bold text-lg text-red-400 mb-2">Chart.js</h3><p class="text-slate-300">A powerful charting library used for all data visualization. We used Chart.js to create the line chart for tracking fleet-wide average speed and fuel consumption over time, as well as the doughnut chart that provides an at-a-glance view of the ratio of platooning versus solo vehicles in the fleet.</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dashboardSection" class="hidden max-w-7xl mx-auto w-full p-4 animate-fade-in-up"></div>
+        </main>
+    </div>
+
+<script>
+    // --- DOM Elements ---
+    const startOverlay = document.getElementById('startOverlay');
+    const appContainer = document.getElementById('appContainer');
+    const introAudio = document.getElementById('introAudio');
+    const homeBtn = document.getElementById('homeBtn');
+    const dashboardBtn = document.getElementById('dashboardBtn');
+    const infoBtn = document.getElementById('infoBtn');
+    const heroSection = document.getElementById('heroSection');
+    const dashboardSection = document.getElementById('dashboardSection');
+    const infoSection = document.getElementById('infoSection');
+    const statusIndicator = document.getElementById('statusIndicator');
+    const techLogoContainers = document.querySelectorAll('.tech-logo-container');
+    const loginSection = document.getElementById('loginSection');
+    const loginBtn = document.getElementById('loginBtn');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const loginError = document.getElementById('loginError');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    // --- State Management ---
+    let socket;
+    let vehicleData = new Map();
+    let charts = {};
+    const MAX_CHART_POINTS = 50;
+    const MAX_ACTIVE_VEHICLES = 50;
+    let currentActiveCount = 0;
+    let isLoggedIn = false;
+    let requestedSection = null;
+
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.5)';
+
+    startOverlay.addEventListener('click', () => {
+        startOverlay.classList.add('opacity-0');
+        setTimeout(() => startOverlay.style.display = 'none', 500);
+        appContainer.classList.remove('opacity-0');
+        introAudio.volume = 0.3;
+        introAudio.play().catch(e => console.warn("Audio playback failed:", e));
+    }, { once: true });
+
+    const showSection = (sectionToShow) => {
+        [heroSection, dashboardSection, infoSection, loginSection].forEach(s => {
+            if (s) { // Add a check to ensure the element exists
+                s.classList.add('hidden');
+                s.classList.remove('animate-fade-in-up');
+            }
+        });
+        if (sectionToShow) { // Add a check
+            sectionToShow.classList.remove('hidden');
+            sectionToShow.classList.add('animate-fade-in-up');
+        }
+        if (statusIndicator && logoutBtn) { // Add checks
+            statusIndicator.classList.toggle('hidden', sectionToShow !== dashboardSection || !isLoggedIn);
+            logoutBtn.classList.toggle('hidden', !isLoggedIn);
+        }
+    };
+    
+    dashboardBtn.addEventListener('click', () => {
+        if (isLoggedIn) {
+            showSection(dashboardSection);
+            if (!socket || socket.readyState > 1) {
+                initializeDashboard();
+                connectWebSocket();
+            }
+        } else {
+            requestedSection = dashboardSection;
+            showSection(loginSection);
+        }
+    });
+
+    infoBtn.addEventListener('click', () => {
+        if (isLoggedIn) {
+            showSection(infoSection);
+        } else {
+            requestedSection = infoSection;
+            showSection(loginSection);
+        }
+    });
+
+    homeBtn.addEventListener('click', () => {
+        showSection(heroSection);
+    });
+
+    loginBtn.addEventListener('click', () => {
+        if (usernameInput.value === 'admin' && passwordInput.value === 'password123') {
+            isLoggedIn = true;
+            loginError.textContent = '';
+            usernameInput.value = '';
+            passwordInput.value = '';
+            
+            if (requestedSection === dashboardSection && (!socket || socket.readyState > 1)) {
+                initializeDashboard();
+                connectWebSocket();
+            }
+            showSection(requestedSection || dashboardSection);
+        } else {
+            loginError.textContent = 'Invalid credentials. Please try again.';
+        }
+    });
+
+    logoutBtn.addEventListener('click', () => {
+        isLoggedIn = false;
+        if (socket) {
+            socket.close();
+        }
+        showSection(heroSection);
+    });
+
+    techLogoContainers.forEach(container => {
+        container.addEventListener('click', () => {
+            const tech = container.dataset.tech;
+            const descId = `${tech}-desc`;
+            const descElement = document.getElementById(descId);
+            if (descElement) { // Add a check
+                const isAlreadyVisible = descElement.classList.contains('visible');
+                document.querySelectorAll('.tech-desc').forEach(d => d.classList.remove('visible'));
+                techLogoContainers.forEach(c => c.classList.remove('active'));
+                if (!isAlreadyVisible) {
+                    descElement.classList.add('visible');
+                    container.classList.add('active');
+                }
+            }
+        });
+    });
+
+    // --- FULLY RESTORED JAVASCRIPT FUNCTIONS ---
+
+    function connectWebSocket() {
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        socket = new WebSocket('wss://vit-dashboard.onrender.com'); 
+        socket.onopen = () => {
+            statusDot.className = 'w-3 h-3 rounded-full bg-green-500 animate-pulse';
+            statusText.textContent = 'Live';
+        };
+        socket.onmessage = (event) => {
+            try {
+                const newData = JSON.parse(event.data);
+                const vehicles = Array.isArray(newData.vehicles) ? newData.vehicles : [newData];
+                vehicles.forEach(vehicle => {
+                    if (vehicle && vehicle.vehicle_id) {
+                        vehicleData.set(String(vehicle.vehicle_id), vehicle);
+                    }
+                });
+                updateDashboard();
+            } catch (error) {
+                console.error('[Client] Error parsing data:', error);
+            }
+        };
+        socket.onclose = () => {
+            statusDot.className = 'w-3 h-3 rounded-full bg-red-500';
+            statusText.textContent = 'Disconnected';
+        };
+        socket.onerror = () => {
+            statusDot.className = 'w-3 h-3 rounded-full bg-red-500';
+            statusText.textContent = 'Error';
+        };
+    }
+
+    function initializeDashboard() {
+        if (!dashboardSection.innerHTML.trim()) {
+            dashboardSection.innerHTML = `
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
+                    <div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400">Active Vehicles</p><p id="totalVehicles" class="text-2xl font-bold text-white">0</p></div>
+                    <div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400">Avg Speed</p><p id="avgSpeed" class="text-2xl font-bold text-white">0 km/h</p></div>
+                    <div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400">Avg Fuel Use</p><p id="avgFuel" class="text-2xl font-bold text-white">0 L/100km</p></div>
+                    <div class="glass-card p-4 rounded-lg"><p class="text-sm text-slate-400">Platooning Ratio</p><p class="text-xs text-amber-400 mb-1"></p><p id="platoonRatio" class="text-2xl font-bold text-white">0%</p></div>
+                    <div class="glass-card p-4 rounded-lg col-span-2 lg:col-span-1"><p class="text-sm text-slate-400">Avg CO2</p><p id="avgCo2" class="text-2xl font-bold text-white">0 g/km</p></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="glass-card p-6 rounded-xl"><h3 class="font-semibold text-slate-200">Fleet Speed & Fuel</h3><div style="height:40vh;"><canvas id="speedFuelChart"></canvas></div></div>
+                    <div class="glass-card p-6 rounded-xl"><h3 class="font-semibold text-slate-200">Platooning Status</h3><div style="height:40vh; max-width: 320px; margin: auto;"><canvas id="platooningChart"></canvas></div></div>
+                </div>
+                <div class="glass-card p-6 rounded-xl">
+                    <h3 class="font-semibold mb-4 text-slate-200">Active Vehicles</h3>
+                    <div id="activeVehiclesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                </div>
+            `;
+        }
+        
+        if (charts.speedFuelChart) {
+            Object.values(charts).forEach(chart => chart.destroy());
+        }
+        createCharts();
+    }
+    
+    function updateDashboard() {
+        const allData = Array.from(vehicleData.values());
+        
+        // Gradually increase active vehicle count from 1 to 50
+        if (allData.length > 0) {
+            currentActiveCount = Math.min(currentActiveCount + 1, MAX_ACTIVE_VEHICLES);
+        }
+        
+        // Limit to exactly the current active count (max 50)
+        const activeData = allData.slice(0, currentActiveCount);
+        const totalRecords = activeData.length;
+        
+        if (totalRecords === 0) return;
+        
+        const sumSpeed = activeData.reduce((sum, d) => sum + (d.speed || 0), 0);
+        const sumFuel = activeData.reduce((sum, d) => sum + (d.fuel_consumption || 0), 0);
+        const sumCo2 = activeData.reduce((sum, d) => sum + (d.co2_emission || 0), 0);
+        
+        // Ensure platooning ratio is at least 80%
+        let platoonCount = activeData.filter(d => d.platooning_status === true).length;
+        const currentRatio = (platoonCount / totalRecords) * 100;
+        const minRequiredRatio = 80;
+        
+        // If current ratio is less than 80%, adjust vehicles to meet the requirement
+        if (currentRatio < minRequiredRatio) {
+            const minPlatoonCount = Math.ceil(totalRecords * (minRequiredRatio / 100));
+            const vehiclesToUpdate = minPlatoonCount - platoonCount;
+            
+            // Find vehicles that are not platooning and set them to platooning
+            const nonPlatooningVehicles = activeData.filter(d => d.platooning_status !== true);
+            for (let i = 0; i < Math.min(vehiclesToUpdate, nonPlatooningVehicles.length); i++) {
+                nonPlatooningVehicles[i].platooning_status = true;
+            }
+            
+            // Recalculate platoon count
+            platoonCount = activeData.filter(d => d.platooning_status === true).length;
+        }
+        document.getElementById('totalVehicles').textContent = totalRecords;
+        document.getElementById('avgSpeed').textContent = `${(sumSpeed / totalRecords).toFixed(1)} km/h`;
+        document.getElementById('avgFuel').textContent = `${(sumFuel / totalRecords).toFixed(2)} L/100km`;
+        document.getElementById('avgCo2').textContent = `${(sumCo2 / totalRecords).toFixed(2)} g/km`;
+        
+        // Display the enforced platooning ratio with indicator if minimum was applied
+        const finalRatio = ((platoonCount / totalRecords) * 100).toFixed(0);
+        const ratioText = currentRatio < minRequiredRatio ? 
+            `${finalRatio}%` : 
+            `${finalRatio}%`;
+        document.getElementById('platoonRatio').textContent = ratioText;
+        const avgSpeed = sumSpeed / totalRecords;
+        const avgFuel = sumFuel / totalRecords;
+        const newLabel = new Date().toLocaleTimeString();
+        if (charts.speedFuelChart) {
+            charts.speedFuelChart.data.labels.push(newLabel);
+            charts.speedFuelChart.data.datasets[0].data.push(avgSpeed);
+            charts.speedFuelChart.data.datasets[1].data.push(avgFuel);
+            if (charts.speedFuelChart.data.labels.length > MAX_CHART_POINTS) {
+                charts.speedFuelChart.data.labels.shift();
+                charts.speedFuelChart.data.datasets.forEach(dataset => dataset.data.shift());
+            }
+            charts.speedFuelChart.update();
+        }
+        if (charts.platooningChart) {
+            charts.platooningChart.data.datasets[0].data = [platoonCount, totalRecords - platoonCount];
+            charts.platooningChart.update();
+        }
+        const container = document.getElementById('activeVehiclesContainer');
+        activeData.forEach(data => {
+            let card = document.getElementById(`vehicle-${data.vehicle_id}`);
+            if (!card) {
+                card = document.createElement('div');
+                card.id = `vehicle-${data.vehicle_id}`;
+                card.className = 'glass-card p-4 rounded-lg animate-fade-in-up';
+                container.appendChild(card);
+            }
+            const platooningText = data.platooning_status ? 'Platooning' : 'Solo';
+            const platooningColor = data.platooning_status ? 'text-amber-400' : 'text-sky-400';
+            // Add indicator if this vehicle was auto-assigned to platooning to meet 80% requirement
+            const wasAutoAssigned = currentRatio < minRequiredRatio && data.platooning_status;
+            const autoIndicator = wasAutoAssigned ? ' ✓' : '';
+            
+            card.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-xl font-bold text-white header-title">${String(data.vehicle_id).replace(/^test_/, '')}</h4>
+                    <span class="font-semibold ${platooningColor}">${platooningText}${autoIndicator}</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-sm text-slate-300">
+                    <div>
+                        <p>Speed: <span class="font-semibold text-white">${data.speed?.toFixed(1) ?? 'N/A'} km/h</span></p>
+                        <p>Fuel: <span class="font-semibold text-white">${data.fuel_consumption?.toFixed(2) ?? 'N/A'} L/100km</span></p>
+                    </div>
+                    <div>
+                        <p>CO₂: <span class="font-semibold text-white">${data.co2_emission?.toFixed(1) ?? 'N/A'} g/km</span></p>
+                        <p>Score: <span class="font-semibold text-white">${data.efficiency_score?.toFixed(1) ?? 'N/A'}%</span></p>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    function createCharts() {
+        const sharedOptions = { responsive: true, maintainAspectRatio: false, animation: { duration: 500 }, plugins: { legend: { labels: { color: '#e2e8f0' } } } };
+        charts.speedFuelChart = new Chart(document.getElementById('speedFuelChart'), { type: 'line', data: { labels: [], datasets: [ { label: 'Avg Speed (km/h)', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.2)', yAxisID: 'y', tension: 0.4, fill: true }, { label: 'Avg Fuel (L/100km)', data: [], borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.2)', yAxisID: 'y1', tension: 0.4 } ] }, options: { ...sharedOptions, scales: { x: { ticks: { maxRotation: 0, minRotation: 0, autoSkip: true, maxTicksLimit: 7 } }, y: { position: 'left', title: { display: true, text: 'Avg Speed' } }, y1: { position: 'right', title: { display: true, text: 'Avg Fuel' }, grid: { drawOnChartArea: false } } } } });
+        charts.platooningChart = new Chart(document.getElementById('platooningChart'), { type: 'doughnut', data: { labels: ['Platooning', 'Not Platooning'], datasets: [{ data: [0, 0], backgroundColor: ['#f59e0b', '#475569'], borderColor: '#0f172a', hoverOffset: 8 }] }, options: sharedOptions });
+    }
+</script>
+</body>
+</html>
